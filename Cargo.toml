@@ -1,6 +1,14 @@
 [package]
 name = "octyl"
 version = "0.1.0"
+description = "A terminal based text editor"
+authors = ["Henry Moore <henrydmoore23@gmail.com>"]
 edition = "2021"
+license = "MIT"
+categories = ["text-editor", "terminal", "cli", "command-line", "editor"]
+repository = "https://github.com/hueblu/octyl"
+default-run = "octyl"
 
 [dependencies]
+
+
