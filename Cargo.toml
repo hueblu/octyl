@@ -11,4 +11,18 @@ default-run = "octyl"
 
 [dependencies]
 
+# terminal
+tui = { package = "ratatui", version = "0.20" }
+crossterm = "0.26.1"
 
+# logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+chrono = "0.4"
+tempfile = "3.6"
+
+# async 
+tokio = { version = "1.28.2", features = ["full"] }
+
+# error handling
+anyhow = "1"
