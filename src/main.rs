@@ -33,7 +33,7 @@ fn setup_logging() -> Result<()> {
     let collector = tracing_subscriber::fmt()
         .with_writer(file)
         .with_max_level(tracing::Level::TRACE)
-        .with_ansi(true)
+        .with_ansi(false)
         .finish();
 
     tracing::subscriber::set_global_default(collector).expect("setting default subscriber failed");
