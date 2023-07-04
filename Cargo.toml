@@ -13,7 +13,7 @@ default-run = "octyl"
 
 # terminal
 tui = { package = "ratatui", version = "0.20" }
-crossterm = "0.26.1"
+crossterm = { version = "0.26.1", features = ["event-stream"] }
 
 # logging
 tracing = "0.1"

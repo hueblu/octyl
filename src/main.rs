@@ -6,6 +6,8 @@ use octyl::App;
 async fn main() -> Result<()> {
     setup_logging()?;
 
+    prep_terminal()?;
+
     let mut app = App::new();
 
     app.run().await?;
@@ -52,5 +54,9 @@ fn setup_logging() -> Result<()> {
         }
     }));
 
+    Ok(())
+}
+
+fn prep_terminal() -> Result<()> {
     Ok(())
 }
