@@ -11,12 +11,7 @@ use crossterm::{
     },
 };
 
-#[derive(Debug)]
-enum Error {
-    Crossterm(crossterm::ErrorKind),
-}
-
-type Result<T> = std::result::Result<T, Error>;
+use octyl::{compositor::ScreenBuffer, error::Result};
 
 fn main() -> Result<()> {
     init_terminal()?;
@@ -56,51 +51,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-struct ScreenBuffer {
-    width: u16,
-    height: u16,
-    data: Vec<char>,
-}
-
-impl ScreenBuffer {
-    fn new() -> Self {
-        let (width, height) = crossterm::terminal::size().unwrap();
-        let data = vec![' '; (width * height) as usize];
-        Self {
-            width,
-            height,
-            data,
-        }
-    }
-
-    fn render(&self) -> Result<()> {
-        execute!(stdout(), MoveTo(0, 0))?;
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let c = self.data[(y * self.width + x) as usize];
-                print!("{c}");
-            }
-        }
-        Ok(())
-    }
-
-    fn write_char_at_idx(&mut self, c: char, idx: u16) -> Result<()> {
-        self.data[idx as usize] = c;
-        Ok(())
-    }
-
-    fn write_char_at_coords(&mut self, c: char, x: u16, y: u16) -> Result<()> {
-        self.data[(y * self.width + x) as usize] = c;
-        Ok(())
-    }
-
-    fn write_char_at_cursor(&mut self, c: char) -> Result<()> {
-        let (x, y) = crossterm::cursor::position()?;
-        self.write_char_at_coords(c, x, y)?;
-        Ok(())
-    }
-}
-
 fn init_terminal() -> Result<()> {
     enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen, Clear(ClearType::All))?;
@@ -111,10 +61,4 @@ fn cleanup_terminal() -> Result<()> {
     disable_raw_mode()?;
     execute!(stdout(), LeaveAlternateScreen, Clear(ClearType::All))?;
     Ok(())
-}
-
-impl From<crossterm::ErrorKind> for Error {
-    fn from(error: crossterm::ErrorKind) -> Self {
-        Error::Crossterm(error)
-    }
 }
