@@ -6,14 +6,33 @@ pub struct Rect {
     pub height: usize,
 }
 
-impl Rect {}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Up,
     Down,
     Left,
     Right,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Split {
+    pub orientation: Orientation,
+    pub ratio: Ratio,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Orientation {
+    Horizontal,
+    Vertical,
+}
+
+// type that represents the ratio
+// between two sections of a split
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Ratio {
+    Percentage(f32),
+    // 50/50
+    Fixed,
 }
 
 impl Direction {
@@ -42,5 +61,17 @@ impl Direction {
             Self::Left => Self::Right,
             Self::Right => Self::Left,
         }
+    }
+}
+
+impl Default for Orientation {
+    fn default() -> Self {
+        Orientation::Vertical
+    }
+}
+
+impl Default for Ratio {
+    fn default() -> Self {
+        Ratio::Fixed
     }
 }

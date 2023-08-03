@@ -35,8 +35,10 @@ fn main() -> Result<()> {
 
         execute!(stdout(), MoveTo(cursor_pos.0, cursor_pos.1))?;
 
-        compositor.draw(|frame| {
-            frame.render_component(&mut doc);
+        compositor.draw(|frame| -> Result<()> {
+            frame.render_component(&mut doc)?;
+
+            Ok(())
         });
 
         match read()? {
