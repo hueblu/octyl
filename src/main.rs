@@ -1,32 +1,36 @@
 #![allow(dead_code)]
-use std::io::stdout;
+
+use std::{io::stdout, sync::OnceLock};
 
 use crossterm::{
     cursor::MoveTo,
     event::{read, Event, KeyCode},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
+    terminal::{Clear, ClearType},
 };
 
 use octyl::{
-    compositor::{Component, Compositor},
+    compositor::{
+        component::AsComponent,
+        frame::{Layer, TiledWindowTree},
+        Compositor,
+    },
     document::Document,
     error::Result,
+    terminal::Terminal,
 };
 
-fn main() -> Result<()> {
-    init_terminal()?;
+#[tokio::main]
+async fn main() -> Result<()> {
+    let mut terminal = Terminal::init()?;
 
     let mut close = false;
 
-    let screen_size = crossterm::terminal::size()?;
-    let mut doc = Document::new((screen_size.0 as usize, screen_size.1 as usize));
+    let screen_size = terminal.size();
+    let mut doc = Document::new(screen_size);
 
-    let mut compositor = Compositor::new();
-    let (mut width, mut height) = crossterm::terminal::size()?;
+    let mut compositor = Compositor::new(screen_size);
+    let (mut width, mut _height) = crossterm::terminal::size()?;
     let mut cursor_pos: (u16, u16);
 
     while !close {
@@ -36,10 +40,14 @@ fn main() -> Result<()> {
         execute!(stdout(), MoveTo(cursor_pos.0, cursor_pos.1))?;
 
         compositor.draw(|frame| -> Result<()> {
-            frame.render_component(&mut doc)?;
+            frame.add_layer(Layer::Tiled(TiledWindowTree::Leaf(Some(
+                doc.as_component(),
+            ))));
 
             Ok(())
-        });
+        })?;
+
+        compositor.render()?;
 
         match read()? {
             Event::Key(keyevent) => match keyevent.code {
@@ -56,7 +64,7 @@ fn main() -> Result<()> {
                 _ => {}
             },
             Event::Resize(w, h) => {
-                (width, height) = (w, h);
+                (width, _height) = (w, h);
             }
             _ => {}
         }
@@ -64,23 +72,5 @@ fn main() -> Result<()> {
         execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
     }
 
-    cleanup_terminal()?;
-    Ok(())
-}
-
-fn init_terminal() -> Result<()> {
-    enable_raw_mode()?;
-    execute!(stdout(), EnterAlternateScreen, Clear(ClearType::All))?;
-    Ok(())
-}
-
-fn cleanup_terminal() -> Result<()> {
-    disable_raw_mode()?;
-    execute!(
-        stdout(),
-        LeaveAlternateScreen,
-        Clear(ClearType::All),
-        MoveTo(0, 0)
-    )?;
     Ok(())
 }

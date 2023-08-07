@@ -2,15 +2,18 @@ use std::any::Any;
 
 use crate::compositor::CharBuffer;
 use crate::error::Result;
-use crate::geometry::Rect;
+use crate::geometry::{Position, Rect};
 
 pub trait Component: Any {
-    fn render(&mut self, size: (usize, usize)) -> Result<CharBuffer>;
-    fn resize(&mut self, size: (usize, usize)) -> Result<()>;
+    fn render(&mut self, size: Position) -> Result<CharBuffer>;
 
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn as_any_box(self: Box<Self>) -> Box<dyn Any>;
+}
+
+pub trait AsComponent {
+    fn as_component(&self) -> Box<dyn Component>;
 }
 
 pub struct Window {
@@ -30,12 +33,14 @@ impl Window {
 #[derive(Default)]
 pub struct EmptyComponent;
 
+#[derive(Default)]
+pub struct TextComponent {
+    pub text: String,
+}
+
 impl Component for EmptyComponent {
-    fn render(&mut self, size: (usize, usize)) -> Result<CharBuffer> {
-        Ok(CharBuffer::new(size.0, size.1))
-    }
-    fn resize(&mut self, _size: (usize, usize)) -> Result<()> {
-        Ok(())
+    fn render(&mut self, size: Position) -> Result<CharBuffer> {
+        Ok(CharBuffer::new(size))
     }
     fn as_any(&self) -> &dyn Any {
         self
@@ -43,6 +48,24 @@ impl Component for EmptyComponent {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    fn as_any_box(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+}
+
+impl Component for TextComponent {
+    fn render(&mut self, size: Position) -> Result<CharBuffer> {
+        Ok(CharBuffer::new(size).with_data(self.text.chars().collect()))
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn as_any_box(self: Box<Self>) -> Box<dyn Any> {
         self
     }

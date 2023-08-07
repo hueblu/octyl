@@ -1,14 +1,14 @@
 pub mod component;
 pub mod frame;
 
-use crate::{error::Result, CharBuffer};
+use crate::{geometry::Position, CharBuffer, Result};
 pub use component::Component;
 pub use frame::Frame;
 
 pub struct Compositor {
     buffers: [CompositorBuffer; 2],
     active_buffer: usize,
-    screen_size: (usize, usize),
+    screen_size: Position,
 }
 
 enum CompositorBuffer {
@@ -17,10 +17,10 @@ enum CompositorBuffer {
 }
 
 impl Compositor {
-    pub fn new(screen_size: (usize, usize)) -> Self {
+    pub fn new(screen_size: Position) -> Self {
         let buffers = [
-            CompositorBuffer::default(),
-            CompositorBuffer::default(),
+            CompositorBuffer::new(screen_size),
+            CompositorBuffer::new(screen_size),
         ];
 
         Self {
@@ -36,11 +36,13 @@ impl Compositor {
         //TODO: find the diff between the two buffers
         // and only render the diff
 
-        let mut buffer = CharBuffer::new(self.screen_size.0, self.screen_size.1);
-
-        self.buffers[self.active_buffer].render()?;
-        self.switch_active_buffer();
-        Ok()
+        self.active_buffer_mut().render();
+        if let Some(buf) = self.active_buffer().get_char_buffer() {
+            self.switch_active_buffer();
+            Ok(buf)
+        } else {
+            unreachable!()
+        }
     }
 
     fn switch_active_buffer(&mut self) {
@@ -51,29 +53,54 @@ impl Compositor {
     ///
     /// will always swith the compositor's active buffer to unrendered,
     /// deleting the previous buffer
-    pub fn draw(&mut self, f: impl FnOnce(Frame) -> Result<Frame>) -> Result<()> {
-        self.buffers[self.active_buffer]
+    pub fn draw(&mut self, f: impl FnOnce(&mut Frame) -> Result<()>) -> Result<()> {
+        let mut frame = Frame::new(self.screen_size);
+        f(&mut frame)?;
 
-        self.buffers[self.active_buffer] = frame.render()?;
+        self.buffers[self.active_buffer] = CompositorBuffer::NotRendered(frame);
 
         Ok(())
+    }
+
+    fn active_buffer(&self) -> &CompositorBuffer {
+        &self.buffers[self.active_buffer]
+    }
+
+    fn inactive_buffer(&self) -> &CompositorBuffer {
+        &self.buffers[(self.active_buffer + 1) % 2]
+    }
+
+    fn active_buffer_mut(&mut self) -> &mut CompositorBuffer {
+        &mut self.buffers[self.active_buffer]
+    }
+
+    fn inactive_buffer_mut(&mut self) -> &mut CompositorBuffer {
+        &mut self.buffers[(self.active_buffer + 1) % 2]
     }
 }
 
 impl CompositorBuffer {
-    fn render(&mut self) -> Result<()> {
+    fn new(screen_size: Position) -> Self {
+        Self::NotRendered(Frame::new(screen_size))
+    }
+
+    fn render(&mut self) {
         match self {
-            Self::Rendered(_) => Ok(()),
+            Self::Rendered(_) => (),
             Self::NotRendered(frame) => {
-                *self = Self::Rendered(frame.render()?);
-                Ok(())
+                *self = Self::Rendered(frame.render());
             }
         }
     }
-}
 
-impl Default for CompositorBuffer {
-    fn default() -> Self {
-        Self::NotRendered(Frame::new())
+    fn is_rendered(&self) -> bool {
+        matches!(self, Self::Rendered(_))
+    }
+
+    fn get_char_buffer(&self) -> Option<CharBuffer> {
+        match self {
+            Self::Rendered(buffer) => Some(buffer.clone()),
+            Self::NotRendered(_) => None,
+        }
     }
 }

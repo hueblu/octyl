@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // compositor that handles the rendering
 // of components to the screen
 pub mod compositor;
@@ -11,6 +13,9 @@ pub mod error;
 
 // geometry and layout shit
 pub mod geometry;
+
+// terminal control
+pub mod terminal;
 
 // utility
 pub mod util;

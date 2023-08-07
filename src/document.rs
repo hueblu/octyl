@@ -2,14 +2,18 @@
 
 use ropey::RopeSlice;
 
-use crate::compositor::{CharBuffer, Component};
-use crate::error::Result;
+use crate::{
+    compositor::{
+        component::{AsComponent, TextComponent},
+        Component,
+    },
+    geometry::Position,
+};
 
 pub struct Document {
     rope: ropey::Rope,
 
-    // (x, y)
-    screen_size: (usize, usize),
+    screen_size: Position,
     line_wrap: bool,
 
     scroll: usize,
@@ -17,7 +21,7 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn new(screen_size: (usize, usize)) -> Self {
+    pub fn new(screen_size: Position) -> Self {
         Self {
             rope: ropey::Rope::new(),
 
@@ -89,10 +93,6 @@ impl Document {
         todo!()
     }
 
-    pub fn resize(&mut self, screen_size: (usize, usize)) {
-        self.screen_size = screen_size;
-    }
-
     /// Returns the lines in the buffer, splitting lines that are longer than
     /// `max_line_len`.
     fn lines_capped(&self) -> Vec<RopeSlice<'_>> {
@@ -103,7 +103,7 @@ impl Document {
                 let mut start_pos = 0;
 
                 while start_pos < line.len_chars() {
-                    let end_pos = std::cmp::min(start_pos + self.screen_size.0, line.len_chars());
+                    let end_pos = std::cmp::min(start_pos + self.screen_size.x, line.len_chars());
                     lines.push(line.slice(start_pos..end_pos));
                     start_pos = end_pos;
                 }
@@ -129,40 +129,15 @@ impl Document {
     }
 }
 
-impl Component for Document {
-    fn render(&mut self, size: (usize, usize)) -> Result<CharBuffer> {
-        self.resize(size);
-        let mut buff = CharBuffer::new(size.0, size.1);
-
-        for (y, line) in self
-            .lines_capped()
-            .into_iter()
-            .skip(self.scroll)
-            .enumerate()
-        {
-            for (x, c) in line.chars().enumerate() {
-                buff.set_char(c, x, y)?;
-            }
-        }
-
-        Ok(buff)
-    }
-
-    fn resize(&mut self, size: (usize, usize)) -> Result<()> {
-        self.resize(size);
-        Ok(())
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-
-    fn as_any_box(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
+impl AsComponent for Document {
+    fn as_component(&self) -> Box<dyn Component> {
+        Box::new(TextComponent {
+            text: self
+                .lines_capped()
+                .iter()
+                .map(|line| line.to_string())
+                .collect(),
+        })
     }
 }
 
