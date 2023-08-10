@@ -2,6 +2,8 @@
 name = "octyl"
 version = "0.1.0"
 edition = "2021"
+license = "LICENSE.md"
+description = "A terminal-based text editor"
 
 [dependencies]
 
