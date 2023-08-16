@@ -2,8 +2,7 @@
 
 ### Code Style
 
-    Follow the existing code style in the project to maintain consistency.
-    Use meaningful variable and function names to enhance readability.
+Follow the existing code style in the project to maintain consistency. Use meaningful variable and function names to enhance readability.
 
 ### Commits
 
