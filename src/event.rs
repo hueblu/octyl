@@ -19,7 +19,7 @@ pub enum Event {
 
 pub struct EventHandler {
     cancel: CancellationToken,
-    handler: task::JoinHandle<Result<ThreadStatus>>,
+    handlers: Vec<task::JoinHandle<Result<ThreadStatus>>>,
 
     pub receiver: broadcast::Receiver<Event>,
 }
@@ -31,14 +31,18 @@ enum ThreadStatus {
 
 impl EventHandler {
     pub fn new() -> Result<Self> {
+        log::debug!("Initializing event handler");
+
         let cancel = CancellationToken::new();
         let (tx, rx) = broadcast::channel(MAX_EVENTS);
+        let mut handlers = Vec::new();
 
-        let handler = spawn_handler_thread(cancel.clone(), tx.clone());
+        handlers.push(spawn_terminal_thread(cancel.clone(), tx.clone()));
+        handlers.push(spawn_tick_thread(cancel.clone(), tx.clone()));
 
         Ok(Self {
             cancel,
-            handler,
+            handlers,
             receiver: rx,
         })
     }
@@ -52,13 +56,13 @@ impl Drop for EventHandler {
     }
 }
 
-fn spawn_handler_thread(
+fn spawn_terminal_thread(
     cancel: CancellationToken,
     sender: broadcast::Sender<Event>,
 ) -> task::JoinHandle<Result<ThreadStatus>> {
+    log::trace!("Spawning terminal thread");
+
     let mut eventstream = EventStream::new();
-    let mut interval = time::interval(Duration::from_secs_f64(TICK_RATE / 60.));
-    interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
 
     task::spawn(async move {
         loop {
@@ -66,10 +70,30 @@ fn spawn_handler_thread(
                 _ = cancel.cancelled() => return Ok(ThreadStatus::Completed),
                 event = eventstream.next() => {
                     if let Some(event) = event {
+                        log::debug!("terminal event sent: {:?}", event);
                         sender.send(Event::Terminal(event.expect("something bad happened crossterm and thread idk")))?;
                     }
                 }
+            }
+        }
+    })
+}
+
+fn spawn_tick_thread(
+    cancel: CancellationToken,
+    sender: broadcast::Sender<Event>,
+) -> task::JoinHandle<Result<ThreadStatus>> {
+    log::trace!("Spawning tick thread");
+
+    let mut interval = time::interval(Duration::from_secs_f64(TICK_RATE / 60.));
+    interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
+
+    task::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => return Ok(ThreadStatus::Completed),
                 _ = interval.tick() => {
+                    log::trace!("tick event sent");
                     sender.send(Event::Tick)?;
                 }
             }

@@ -34,6 +34,18 @@ impl Document {
         }
     }
 
+    pub fn insert_char<C: Into<char>>(&mut self, _c: C) {
+        todo!()
+    }
+
+    pub fn delete_char(&mut self) {
+        todo!()
+    }
+
+    pub fn insert_newline(&mut self) {
+        todo!()
+    }
+
     pub fn paragraph<'a>(&self) -> Paragraph<'a> {
         Paragraph::new(self.buf.text()).scroll(self.scroll)
     }

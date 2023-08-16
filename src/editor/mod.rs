@@ -7,14 +7,23 @@ use tui::{
     widgets::{Block, Widget},
 };
 
+use crossterm::event::{Event as CrossEvent, KeyCode, KeyEvent};
+
 #[derive(Clone)]
 pub struct Editor<'a> {
     current_doc: usize,
     docs: Vec<Document>,
+    mode: Mode,
 
     block: Option<Block<'a>>,
     alignment: Alignment,
     style: Style,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mode {
+    Normal,
+    Insert,
 }
 
 impl<'a> Editor<'a> {
@@ -22,6 +31,7 @@ impl<'a> Editor<'a> {
         Self {
             current_doc: 0,
             docs: vec![Document::new()],
+            mode: Mode::Normal,
 
             block: None,
             alignment: Alignment::Left,
@@ -29,8 +39,29 @@ impl<'a> Editor<'a> {
         }
     }
 
-    fn get_current_document(&self) -> &Document {
+    fn get_doc(&self) -> &Document {
         &self.docs[self.current_doc]
+    }
+
+    fn get_doc_mut(&mut self) -> &mut Document {
+        &mut self.docs[self.current_doc]
+    }
+
+    pub fn handle_terminal_event(&mut self, event: CrossEvent) {
+        match self.mode {
+            Mode::Insert => {
+                if let CrossEvent::Key(KeyEvent { code, .. }) = event {
+                    match code {
+                        KeyCode::Esc => self.mode = Mode::Normal,
+                        KeyCode::Char(c) => self.get_doc_mut().insert_char::<char>(c.into()),
+                        KeyCode::Backspace => self.get_doc_mut().delete_char(),
+                        KeyCode::Enter => self.get_doc_mut().insert_newline(),
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
@@ -55,7 +86,7 @@ where
 impl<'a> Widget for Editor<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut inner = self
-            .get_current_document()
+            .get_doc()
             .paragraph()
             .style(self.style)
             .alignment(self.alignment);

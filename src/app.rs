@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Result;
 use crossterm::{
-    event::{KeyCode, KeyEvent},
+    event::{Event as CrossEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use tui::{prelude::CrosstermBackend, Frame, Terminal};
@@ -65,11 +65,18 @@ impl<'a> App<'a> {
 
     pub async fn tick(&mut self) {}
 
-    pub async fn handle_terminal_event(&mut self, event: crossterm::event::Event) {
+    pub async fn handle_terminal_event(&mut self, event: CrossEvent) {
         match event {
-            crossterm::event::Event::Key(KeyEvent {
-                code: KeyCode::Esc, ..
+            CrossEvent::Key(KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
             }) => self.close = true,
+
+            CrossEvent::Key(KeyEvent {
+                kind: KeyEventKind::Press | KeyEventKind::Repeat,
+                ..
+            }) => self.editor.handle_terminal_event(event),
 
             _ => {}
         }

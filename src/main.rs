@@ -3,9 +3,11 @@
 use anyhow::Result;
 use octyl::app::App;
 
+const LOG_LEVEL: u64 = 1;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    setup_logging(0)?;
+    setup_logging(LOG_LEVEL)?;
 
     let code = App::new()?.run().await?;
     std::process::exit(code);
@@ -28,7 +30,7 @@ fn setup_logging(verbosity: u64) -> Result<()> {
                 message,
             ))
         })
-        .chain(fern::log_file(".log")?);
+        .chain(fern::log_file("log")?);
 
     base_config.chain(file_config).apply()?;
 
