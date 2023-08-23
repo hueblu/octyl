@@ -1,5 +1,7 @@
 mod document;
 
+use anyhow::Result;
+
 use document::Document;
 use tui::{
     prelude::{Alignment, Buffer, Rect},
@@ -7,7 +9,9 @@ use tui::{
     widgets::{Block, Widget},
 };
 
-use crossterm::event::{Event as CrossEvent, KeyCode, KeyEvent};
+use crossterm::event::{Event as CrossEvent, KeyCode, KeyEvent, KeyEventKind};
+
+use crate::app::Component;
 
 #[derive(Clone)]
 pub struct Editor<'a> {
@@ -21,7 +25,7 @@ pub struct Editor<'a> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Mode {
+pub enum Mode {
     Normal,
     Insert,
 }
@@ -31,7 +35,7 @@ impl<'a> Editor<'a> {
         Self {
             current_doc: 0,
             docs: vec![Document::new()],
-            mode: Mode::Normal,
+            mode: Mode::Insert,
 
             block: None,
             alignment: Alignment::Left,
@@ -47,20 +51,69 @@ impl<'a> Editor<'a> {
         &mut self.docs[self.current_doc]
     }
 
-    pub fn handle_terminal_event(&mut self, event: CrossEvent) {
-        match self.mode {
-            Mode::Insert => {
-                if let CrossEvent::Key(KeyEvent { code, .. }) = event {
-                    match code {
-                        KeyCode::Esc => self.mode = Mode::Normal,
-                        KeyCode::Char(c) => self.get_doc_mut().insert_char::<char>(c.into()),
-                        KeyCode::Backspace => self.get_doc_mut().delete_char(),
-                        KeyCode::Enter => self.get_doc_mut().insert_newline(),
+    pub async fn handle_terminal_event(&mut self, event: CrossEvent) -> Result<()> {
+        if let CrossEvent::Key(KeyEvent {
+            code,
+            kind: KeyEventKind::Press,
+            ..
+        }) = event
+        {
+            use KeyCode::*;
+
+            match self.mode {
+                Mode::Insert => match code {
+                    Esc => self.mode = Mode::Normal,
+                    Char(c) => self.get_doc_mut().insert_char::<char>(c.into()).await,
+                    Backspace => self.get_doc_mut().delete_char().await,
+                    Enter => self.get_doc_mut().insert_newline().await,
+                    _ => {}
+                },
+                Mode::Normal => match code {
+                    Char(c) => match c {
+                        'i' => self.mode = Mode::Insert,
                         _ => {}
-                    }
-                }
+                    },
+                    _ => {}
+                },
             }
-            _ => {}
+        }
+        Ok(())
+    }
+}
+
+pub struct EditorRenderer<'a> {
+    doc: &'a Document,
+    style: Style,
+    alignment: Alignment,
+    block: Option<Block<'a>>,
+}
+
+impl<'a> Component<'a> for Editor<'a> {
+    type Renderer = EditorRenderer<'a>;
+
+    fn as_widget(&'a self) -> Self::Renderer {
+        EditorRenderer::from(self)
+    }
+
+    fn get_cursor(&self) -> Option<(u16, u16)> {
+        log::info!(
+            "Getting cursor coords at {:?}",
+            self.get_doc().cursor_coords()
+        );
+        Some(self.get_doc().cursor_coords())
+    }
+}
+
+impl<'a> EditorRenderer<'a> {
+    fn from<'b>(editor: &'b Editor) -> Self
+    where
+        'b: 'a,
+    {
+        Self {
+            doc: editor.get_doc(),
+            style: editor.style,
+            alignment: editor.alignment,
+            block: editor.block.clone(),
         }
     }
 }
@@ -83,10 +136,10 @@ where
     }
 }
 
-impl<'a> Widget for Editor<'a> {
+impl<'a> Widget for EditorRenderer<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut inner = self
-            .get_doc()
+            .doc
             .paragraph()
             .style(self.style)
             .alignment(self.alignment);

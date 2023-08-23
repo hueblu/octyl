@@ -1,6 +1,5 @@
 /*
  * stolen DIRECTLY from https://github.com/rhysd/tui-textarea/
- *
  */
 
 use tui::{
@@ -39,6 +38,23 @@ impl TextBuffer {
             .map(|s| s.clone().into())
             .collect::<Vec<Line>>()
             .into()
+    }
+
+    pub fn insert_char<C: Into<char>>(&mut self, coords: (u16, u16), c: C) {
+        self.lines[coords.1 as usize].insert(coords.0 as usize, c.into());
+    }
+
+    pub fn delete_char(&mut self, coords: (u16, u16)) {
+        let line = &mut self.lines[coords.1 as usize];
+
+        if !(coords.0 as usize > line.len()) {
+            line.remove(coords.0 as usize);
+        }
+    }
+
+    pub fn insert_newline(&mut self, coords: (u16, u16)) {
+        let newline = self.lines[coords.1 as usize].split_off(coords.0 as usize);
+        self.lines.insert(coords.1 as usize + 1, newline);
     }
 }
 
