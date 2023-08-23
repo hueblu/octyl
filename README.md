@@ -4,7 +4,7 @@ octyl is a WIP text editor for the terminal, written in Rust. It aims to provide
 
 ## Contributing
 
-Contributions to RustyTerminalTextEditor are welcome! If you'd like to contribute, please follow the guidelines outlined in [CONTRIBUTING.md](CONTRIBUTING.md).
+If you'd like to contribute, please follow the guidelines outlined in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Roadmap
 
