@@ -11,7 +11,7 @@ use tui::{
 
 use crossterm::event::{Event as CrossEvent, KeyCode, KeyEvent, KeyEventKind};
 
-use crate::app::Component;
+use crate::compositor::Component;
 
 #[derive(Clone)]
 pub struct Editor<'a> {
@@ -89,7 +89,7 @@ pub struct EditorRenderer<'a> {
 }
 
 impl<'a> Component<'a> for Editor<'a> {
-    type Renderer = EditorRenderer<'a>;
+    type Renderer = Box<EditorRenderer<'a>>;
 
     fn as_widget(&'a self) -> Self::Renderer {
         EditorRenderer::from(self)

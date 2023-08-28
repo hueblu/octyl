@@ -11,7 +11,7 @@ use crossterm::{
 use tui::{prelude::CrosstermBackend, Frame, Terminal};
 
 use crate::{
-    editor::Editor,
+    compositor::Layers,
     event::{Event, EventHandler},
 };
 
@@ -22,25 +22,7 @@ pub struct App<'a> {
     pub close: bool,
 
     events: EventHandler,
-    editor: Editor<'a>,
-}
-
-pub trait Component<'a> {
-    type Renderer: tui::widgets::Widget;
-
-    fn as_widget(&'a self) -> Self::Renderer;
-    fn get_cursor(&self) -> Option<(u16, u16)>;
-    fn render(&'a self, frame: &mut Frame<'_, CrosstermBackend<io::Stdout>>, cursor: bool) {
-        let widget = self.as_widget();
-
-        frame.render_widget(widget, frame.size());
-
-        if cursor {
-            if let Some((x, y)) = self.get_cursor() {
-                frame.set_cursor(x, y);
-            }
-        }
-    }
+    layers: Layers<'a>,
 }
 
 impl<'a> App<'a> {
@@ -50,7 +32,7 @@ impl<'a> App<'a> {
         Ok(Self {
             close: false,
             events: EventHandler::new()?,
-            editor: Editor::from("Hello World\n\nPress <esc> to exit".lines()),
+            layers: Layers::new(),
         })
     }
 
