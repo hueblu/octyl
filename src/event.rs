@@ -1,102 +1,99 @@
-use std::time::Duration;
+use std::sync::Arc;
 
-use anyhow::Result;
-use crossterm::event::{Event as TerminalEvent, EventStream};
-use futures::StreamExt;
-use tokio::{sync::broadcast, task, time};
+use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind, MouseEvent};
+use futures::{FutureExt, StreamExt};
+use serde_derive::{Deserialize, Serialize};
+use tokio::{
+  sync::{mpsc, Mutex},
+  task::JoinHandle,
+};
 use tokio_util::sync::CancellationToken;
 
-const MAX_EVENTS: usize = 100;
-// ticks per second
-const TICK_RATE: f64 = 5.;
+use crate::{
+  action::Action,
+  components::{home::Home, Component},
+};
 
-#[derive(Clone, Debug)]
+// ANCHOR: event
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Event {
-    CtrlC,
-    Tick,
-    Terminal(TerminalEvent),
+  Quit,
+  Error,
+  Closed,
+  RenderTick,
+  AppTick,
+  Key(KeyEvent),
+  Mouse(MouseEvent),
+  Resize(u16, u16),
 }
 
 pub struct EventHandler {
-    cancel: CancellationToken,
-    handlers: Vec<task::JoinHandle<Result<ThreadStatus>>>,
-
-    pub receiver: broadcast::Receiver<Event>,
-}
-
-enum ThreadStatus {
-    Failed,
-    Completed,
+  pub task: JoinHandle<()>,
+  cancellation_token: CancellationToken,
 }
 
 impl EventHandler {
-    pub fn new() -> Result<Self> {
-        log::debug!("Initializing event handler");
+  pub fn new(tick_rate: (u64, u64), home: Arc<Mutex<Home>>, action_tx: mpsc::UnboundedSender<Action>) -> Self {
+    let (app_tick_rate, render_tick_rate) = tick_rate;
 
-        let cancel = CancellationToken::new();
-        let (tx, rx) = broadcast::channel(MAX_EVENTS);
-        let mut handlers = Vec::new();
+    let (event_tx, mut event_rx) = mpsc::unbounded_channel();
 
-        handlers.push(spawn_terminal_thread(cancel.clone(), tx.clone()));
-        handlers.push(spawn_tick_thread(cancel.clone(), tx.clone()));
+    let app_tick_rate = std::time::Duration::from_millis(app_tick_rate);
+    let render_tick_rate = std::time::Duration::from_millis(render_tick_rate);
 
-        Ok(Self {
-            cancel,
-            handlers,
-            receiver: rx,
-        })
-    }
-}
-
-impl Drop for EventHandler {
-    fn drop(&mut self) {
-        self.cancel.cancel();
-
-        // wait for the threads to complete
-    }
-}
-
-fn spawn_terminal_thread(
-    cancel: CancellationToken,
-    sender: broadcast::Sender<Event>,
-) -> task::JoinHandle<Result<ThreadStatus>> {
-    log::trace!("Spawning terminal thread");
-
-    let mut eventstream = EventStream::new();
-
-    task::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = cancel.cancelled() => return Ok(ThreadStatus::Completed),
-                event = eventstream.next() => {
-                    if let Some(event) = event {
-                        log::debug!("terminal event sent: {:?}", event);
-                        sender.send(Event::Terminal(event.expect("something bad happened crossterm and thread idk")))?;
+    let cancellation_token = CancellationToken::new();
+    let _cancellation_token = cancellation_token.clone();
+    let task = tokio::spawn(async move {
+      let mut reader = crossterm::event::EventStream::new();
+      let mut app_interval = tokio::time::interval(app_tick_rate);
+      let mut render_interval = tokio::time::interval(render_tick_rate);
+      loop {
+        let app_delay = app_interval.tick();
+        let render_delay = render_interval.tick();
+        let crossterm_event = reader.next().fuse();
+        tokio::select! {
+          _ = _cancellation_token.cancelled() => {
+            break;
+          }
+          maybe_event = crossterm_event => {
+            match maybe_event {
+              Some(Ok(evt)) => {
+                match evt {
+                  CrosstermEvent::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                      event_tx.send(Event::Key(key)).unwrap();
                     }
+                  },
+                  CrosstermEvent::Resize(x, y) => {
+                    event_tx.send(Event::Resize(x, y)).unwrap();
+                  },
+                  _ => {},
                 }
+              }
+              Some(Err(_)) => {
+                event_tx.send(Event::Error).unwrap();
+              }
+              None => {},
             }
+          },
+          _ = app_delay => {
+              event_tx.send(Event::AppTick).unwrap();
+          },
+          _ = render_delay => {
+              event_tx.send(Event::RenderTick).unwrap();
+          },
+          event = event_rx.recv() => {
+            let action = home.lock().await.handle_events(event);
+            action_tx.send(action).unwrap();
+          }
         }
-    })
+      }
+    });
+    Self { task, cancellation_token }
+  }
+
+  pub fn stop(&mut self) {
+    self.cancellation_token.cancel();
+  }
 }
-
-fn spawn_tick_thread(
-    cancel: CancellationToken,
-    sender: broadcast::Sender<Event>,
-) -> task::JoinHandle<Result<ThreadStatus>> {
-    log::trace!("Spawning tick thread");
-
-    let mut interval = time::interval(Duration::from_secs_f64(TICK_RATE / 60.));
-    interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
-
-    task::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = cancel.cancelled() => return Ok(ThreadStatus::Completed),
-                _ = interval.tick() => {
-                    log::trace!("tick event sent");
-                    sender.send(Event::Tick)?;
-                }
-            }
-        }
-    })
-}
+// ANCHOR_END: event

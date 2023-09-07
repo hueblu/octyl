@@ -1,113 +1,76 @@
-use std::{
-    io::{self},
-    panic,
-};
+use std::sync::Arc;
 
 use anyhow::Result;
-use crossterm::{
-    event::{Event as CrossEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use tui::{prelude::CrosstermBackend, Frame, Terminal};
+use tokio::sync::{mpsc, Mutex};
 
 use crate::{
-    compositor::Layers,
-    event::{Event, EventHandler},
+  action::Action,
+  components::{home::Home, Component},
+  config::Config,
+  event::EventHandler,
+  terminal::TerminalHandler,
+  trace_dbg,
 };
 
-/// The main app struct
-pub struct App<'a> {
-    // whether the app should close
-    // on the next loop
-    pub close: bool,
-
-    events: EventHandler,
-    layers: Layers<'a>,
+pub struct App {
+  pub config: Config,
+  pub tick_rate: (u64, u64),
+  pub home: Arc<Mutex<Home>>,
+  pub should_quit: bool,
+  pub should_suspend: bool,
 }
 
-impl<'a> App<'a> {
-    pub fn new() -> Result<Self> {
-        log::info!("Initializing app");
+impl App {
+  pub fn new(tick_rate: (u64, u64)) -> Result<Self> {
+    let h = Home::new();
+    let config = Config::new()?;
+    let h = h.keymap(config.keymap.0.clone());
+    let home = Arc::new(Mutex::new(h));
+    Ok(Self { tick_rate, home, should_quit: false, should_suspend: false, config })
+  }
 
-        Ok(Self {
-            close: false,
-            events: EventHandler::new()?,
-            layers: Layers::new(),
-        })
-    }
+  pub async fn run(&mut self) -> Result<()> {
+    let (action_tx, mut action_rx) = mpsc::unbounded_channel();
 
-    pub async fn run(&mut self) -> Result<i32> {
-        log::info!("Running app");
+    self.home.lock().await.init(action_tx.clone())?;
 
-        let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+    let mut terminal = TerminalHandler::new(self.home.clone());
+    let mut event = EventHandler::new(self.tick_rate, self.home.clone(), action_tx.clone());
 
-        setup_terminal()?;
-        terminal.clear()?;
-
-        while !self.close {
-            match self.events.receiver.recv().await? {
-                Event::CtrlC => self.close = true,
-                Event::Tick => self.tick().await,
-                Event::Terminal(event) => self.handle_terminal_event(event).await?,
-            }
-
-            terminal.draw(|f| {
-                let _ = self.draw(f);
-            })?;
+    loop {
+      if let Some(action) = action_rx.recv().await {
+        if action != Action::Tick && action != Action::RenderTick {
+          trace_dbg!(&action);
         }
-
-        cleanup_terminal()?;
-
-        Ok(0)
-    }
-
-    pub async fn tick(&mut self) {}
-
-    pub async fn handle_terminal_event(&mut self, event: CrossEvent) -> Result<()> {
-        match event {
-            CrossEvent::Key(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            }) => self.close = true,
-
-            CrossEvent::Key(KeyEvent {
-                kind: KeyEventKind::Press | KeyEventKind::Repeat,
-                ..
-            }) => self.editor.handle_terminal_event(event).await?,
-
-            _ => {}
+        match action {
+          Action::RenderTick => terminal.render()?,
+          Action::Quit => self.should_quit = true,
+          Action::Suspend => self.should_suspend = true,
+          Action::Resume => self.should_suspend = false,
+          action => {
+            if let Some(_action) = self.home.lock().await.dispatch(action) {
+              action_tx.send(_action)?
+            };
+          },
         }
-
-        Ok(())
+      }
+      if self.should_suspend {
+        terminal.suspend()?;
+        event.stop();
+        terminal.task.await?;
+        event.task.await?;
+        terminal = TerminalHandler::new(self.home.clone());
+        event = EventHandler::new(self.tick_rate, self.home.clone(), action_tx.clone());
+        action_tx.send(Action::Resume)?;
+        action_tx.send(Action::RenderTick)?;
+      } else if self.should_quit {
+        terminal.stop()?;
+        event.stop();
+        terminal.task.await?;
+        event.task.await?;
+        break;
+      }
     }
-
-    pub fn draw(&mut self, frame: &mut Frame<'_, CrosstermBackend<io::Stdout>>) -> Result<()> {
-        self.editor.render(frame, true);
-        Ok(())
-    }
-}
-
-fn setup_terminal() -> Result<()> {
-    log::trace!("Setting up terminal");
-
-    enable_raw_mode()?;
-    crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
-
-    let panic_hook = panic::take_hook();
-    panic::set_hook(Box::new(move |panic| {
-        cleanup_terminal().expect("Failed to cleanup terminal");
-        panic_hook(panic);
-    }));
-
     Ok(())
-}
-
-fn cleanup_terminal() -> Result<()> {
-    log::trace!("Cleaning up terminal");
-
-    disable_raw_mode()?;
-    crossterm::execute!(io::stdout(), LeaveAlternateScreen)?;
-
-    Ok(())
+  }
 }

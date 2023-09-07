@@ -1,38 +1,37 @@
-#![allow(dead_code)]
-
+// ANCHOR: all
 use anyhow::Result;
-use octyl::app::App;
+use clap::Parser;
+use octyl::{
+  app::App,
+  utils::{initialize_logging, initialize_panic_handler, version},
+};
 
-const LOG_LEVEL: u64 = 1;
+//// ANCHOR: args
+// Define the command line arguments structure
+#[derive(Parser, Debug)]
+#[command(version = version(), about = "text editor")]
+struct Args {
+  /// App tick rate
+  #[arg(short, long, default_value_t = 1000)]
+  app_tick_rate: u64,
+  /// Render tick rate
+  #[arg(short, long, default_value_t = 50)]
+  render_tick_rate: u64,
+}
+//// ANCHOR_END: args
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    setup_logging(LOG_LEVEL)?;
+async fn main() -> Result<()> {
+  initialize_logging()?;
 
-    let code = App::new()?.run().await?;
-    std::process::exit(code);
+  initialize_panic_handler();
+
+  let args = Args::parse();
+  let tick_rate = (args.app_tick_rate, args.render_tick_rate);
+
+  let mut app = App::new(tick_rate)?;
+  app.run().await?;
+
+  Ok(())
 }
-
-fn setup_logging(verbosity: u64) -> Result<()> {
-    let base_config = fern::Dispatch::new().level(match verbosity {
-        0 => log::LevelFilter::Info,
-        1 => log::LevelFilter::Debug,
-        _ => log::LevelFilter::Trace,
-    });
-
-    let file_config = fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{} {}]({}) {}",
-                record.level(),
-                record.target(),
-                chrono::offset::Local::now().format("%b-%d %H:%M:%S"),
-                message,
-            ))
-        })
-        .chain(fern::log_file("log")?);
-
-    base_config.chain(file_config).apply()?;
-
-    Ok(())
-}
+// ANCHOR_END: all
