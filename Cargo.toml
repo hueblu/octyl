@@ -42,6 +42,7 @@ tokio-stream = "0.1.14"
 tokio-util = "0.7.8"
 futures = "0.3.28"
 async-trait = "0.1"
+async-recursion = "1.0"
 
 # error handling
 anyhow = "1.0.71"

@@ -1,24 +1,17 @@
 use async_trait::async_trait;
 use ratatui::layout::{
-    Alignment, Constraint, Direction, Rect,
+    Constraint, Direction, Layout, Rect,
 };
 use tokio::sync::mpsc::{self, UnboundedSender};
 
-use super::Component;
+use super::{logger::Logger, Component};
 use crate::{action::Action, terminal::Frame};
 
 type Window = Box<dyn Component>;
 
 pub enum Layer {
-    Floating {
-        component: Window,
-        rect: Rect,
-    },
-    Tiled {
-        root_node: ComponentTreeNode,
-        alignment: Alignment,
-        active: usize,
-    },
+    Floating { component: Window, rect: Rect },
+    Tiled { root_node: ComponentTreeNode, active: usize },
 }
 
 pub enum ComponentTreeNode {
@@ -35,7 +28,7 @@ pub enum ComponentTreeNode {
 
 #[derive(Default)]
 pub struct Root {
-    layers: Vec<Box<Layer>>,
+    layers: Vec<Layer>,
     action_tx:
         Option<mpsc::UnboundedSender<Box<dyn Action>>>,
 }
@@ -53,7 +46,16 @@ impl ComponentTreeNode {
 
 impl Root {
     pub fn new() -> Self {
-        Self::default()
+        let mut root = Self::default();
+
+        root.layers.push(Layer::Tiled {
+            root_node: ComponentTreeNode::Leaf {
+                component: Box::new(Logger::default()),
+            },
+            active: 0,
+        });
+
+        root
     }
 }
 
@@ -67,26 +69,56 @@ impl Component for Root {
         Ok(())
     }
 
-    async fn render(
-        &mut self,
-        f: &mut Frame<'_>,
-        area: Rect,
-    ) {
-        fn render_node(
+    fn render(&mut self, f: &mut Frame<'_>, area: Rect) {
+        fn render_node<'a, 'b>(
             root: &mut ComponentTreeNode,
-            area: Rect,
+            f: &'a mut Frame<'b>,
+            rect: Rect,
         ) {
             match root {
-                ComponentTreeNode::Leaf { component } => {},
+                ComponentTreeNode::Leaf { component } => {
+                    component.render(f, rect)
+                },
                 ComponentTreeNode::Branch {
                     children,
                     direction,
                     constraints,
-                    focused,
+                    ..
                 } => {
                     if children.is_empty() {
                         return;
+                    };
+
+                    let rects = Layout::default()
+                        .direction(direction.clone())
+                        .constraints(
+                            constraints
+                                .clone()
+                                .into_boxed_slice(),
+                        )
+                        .split(rect)
+                        .to_vec();
+
+                    for (child, rect) in
+                        children.into_iter().zip(rects)
+                    {
+                        render_node(child, f, rect);
                     }
+                },
+            }
+        }
+
+        for layer in &mut self.layers {
+            match layer {
+                Layer::Floating {
+                    ref mut component,
+                    rect,
+                } => {
+                    component.render(f, *rect);
+                },
+
+                Layer::Tiled { root_node, .. } => {
+                    render_node(root_node, f, area);
                 },
             }
         }

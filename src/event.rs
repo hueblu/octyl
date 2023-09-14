@@ -82,7 +82,7 @@ impl EventHandler {
                           },
 
                         CrosstermEvent::Key(KeyEvent {code: KeyCode::Char('c'), modifiers, ..}) if modifiers.contains(KeyModifiers::CONTROL) => {
-                            action_tx.send(Box::new(AppAction::Quit));
+                            action_tx.send(Box::new(AppAction::Quit)).expect("failed to send quit action");
                         },
 
                           CrosstermEvent::Resize(x, y) => {

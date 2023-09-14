@@ -50,6 +50,8 @@ impl App {
 
         loop {
             if let Some(action) = action_rx.recv().await {
+                let mut consumed = true;
+
                 if let Some(action) = action
                     .as_any()
                     .downcast_ref::<AppAction>(
@@ -62,22 +64,26 @@ impl App {
 
                     match action {
                         AppAction::RenderTick => {
-                            terminal.render()?
+                            terminal.render()?;
+                            trace_dbg!("Render Tick");
                         },
                         AppAction::Quit => {
                             self.should_quit = true
                         },
-                        _ => {},
+                        _ => consumed = false,
                     }
                 }
-                if let Some(_action) = self
-                    .root
-                    .lock()
-                    .await
-                    .dispatch(action)
-                    .await
-                {
-                    action_tx.send(_action)?;
+
+                if !consumed {
+                    if let Some(_action) = self
+                        .root
+                        .lock()
+                        .await
+                        .dispatch(action)
+                        .await
+                    {
+                        action_tx.send(_action)?;
+                    }
                 };
             }
             if self.should_quit {

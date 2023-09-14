@@ -100,9 +100,5 @@ pub trait Component: Send + Sync {
     }
 
     /// Renders the component to the given frame.
-    async fn render(
-        &mut self,
-        f: &mut Frame<'_>,
-        rect: Rect,
-    );
+    fn render(&mut self, f: &mut Frame<'_>, rect: Rect);
 }

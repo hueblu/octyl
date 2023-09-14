@@ -23,18 +23,14 @@ pub struct Logger {
 impl Component for Logger {
     fn init(
         &mut self,
-        tx: UnboundedSender<Box<dyn Action>>,
+        _tx: UnboundedSender<Box<dyn Action>>,
     ) -> Result<()> {
         self.state = TuiWidgetState::new()
             .set_default_display_level(LevelFilter::Debug);
         Ok(())
     }
 
-    async fn render(
-        &mut self,
-        f: &mut Frame<'_>,
-        rect: Rect,
-    ) {
+    fn render(&mut self, f: &mut Frame<'_>, rect: Rect) {
         let w = TuiLoggerWidget::default()
             .block(
                 Block::default()

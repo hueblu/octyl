@@ -7,7 +7,9 @@ use anyhow::{anyhow, Context, Result};
 use crossterm::{
     cursor,
     event::{DisableMouseCapture, EnableMouseCapture},
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        EnterAlternateScreen, LeaveAlternateScreen,
+    },
 };
 use ratatui::backend::CrosstermBackend as Backend;
 use tokio::{
@@ -17,15 +19,19 @@ use tokio::{
 
 use crate::components::{root::Root, Component};
 
-pub type Frame<'a> = ratatui::Frame<'a, Backend<std::io::Stderr>>;
+pub type Frame<'a> =
+    ratatui::Frame<'a, Backend<std::io::Stderr>>;
 
 pub struct Tui {
-    pub terminal: ratatui::Terminal<Backend<std::io::Stderr>>,
+    pub terminal:
+        ratatui::Terminal<Backend<std::io::Stderr>>,
 }
 
 impl Tui {
     pub fn new() -> Result<Self> {
-        let terminal = ratatui::Terminal::new(Backend::new(std::io::stderr()))?;
+        let terminal = ratatui::Terminal::new(
+            Backend::new(std::io::stderr()),
+        )?;
         Ok(Self { terminal })
     }
 
@@ -54,7 +60,9 @@ impl Tui {
     pub fn suspend(&self) -> Result<()> {
         self.exit()?;
         #[cfg(not(windows))]
-        signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP)?;
+        signal_hook::low_level::raise(
+            signal_hook::consts::signal::SIGTSTP,
+        )?;
         Ok(())
     }
 
@@ -65,7 +73,8 @@ impl Tui {
 }
 
 impl Deref for Tui {
-    type Target = ratatui::Terminal<Backend<std::io::Stderr>>;
+    type Target =
+        ratatui::Terminal<Backend<std::io::Stderr>>;
 
     fn deref(&self) -> &Self::Target {
         &self.terminal
@@ -98,10 +107,15 @@ pub struct TerminalHandler {
 
 impl TerminalHandler {
     pub fn new(home: Arc<Mutex<Root>>) -> Self {
-        let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
+        let (tx, mut rx) =
+            mpsc::unbounded_channel::<Message>();
 
         let task = tokio::spawn(async move {
-            let mut t = Tui::new().context(anyhow!("Unable to create terminal")).unwrap();
+            let mut t = Tui::new()
+                .context(anyhow!(
+                    "Unable to create terminal"
+                ))
+                .unwrap();
             t.enter().unwrap();
             loop {
                 match rx.recv().await {
