@@ -11,11 +11,11 @@ readme = "README.md"
 
 # terminal
 ratatui = { version = "0.21.0" }
-crossterm = { version = "0.26.1", default-features = false, features = [
+crossterm = { version = "0.27", default-features = false, features = [
   "event-stream",
   "serde",
 ] }
-tui-input = "0.7.1"
+tui-input = "0.8"
 libc = "0.2.146"
 colored = "2.0.0"
 

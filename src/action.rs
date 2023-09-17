@@ -28,16 +28,14 @@ pub trait ActionTrait {
 
 impl<T> ActionTrait for T
 where
-    T: 'static + Action + Clone + PartialEq,
+    T: 'static + Action + Clone + PartialEq + Debug,
 {
     fn clone_box(&self) -> Box<dyn Action> {
         Box::new(self.clone())
     }
 
     fn is_equal(&self, other: &dyn Action) -> bool {
-        if let Some(other) =
-            other.as_any().downcast_ref::<T>()
-        {
+        if let Some(other) = other.as_any().downcast_ref::<T>() {
             self == other
         } else {
             false
@@ -58,18 +56,13 @@ impl PartialEq for Box<dyn Action> {
 }
 
 impl Debug for Box<dyn Action> {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Box<dyn Action>")
     }
 }
 
 impl<'de> Deserialize<'de> for Box<dyn Action> {
-    fn deserialize<D>(
-        _deserializer: D,
-    ) -> Result<Self, D::Error>
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -77,9 +70,7 @@ impl<'de> Deserialize<'de> for Box<dyn Action> {
     }
 }
 
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AppAction {
     Quit,
     Tick,

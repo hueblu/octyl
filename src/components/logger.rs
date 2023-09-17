@@ -7,9 +7,7 @@ use ratatui::{
     widgets::{Block, Borders},
 };
 use tokio::sync::mpsc::UnboundedSender;
-use tui_logger::{
-    TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState,
-};
+use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
 use super::{Component, Frame};
 use crate::action::Action;
@@ -21,28 +19,18 @@ pub struct Logger {
 
 #[async_trait]
 impl Component for Logger {
-    fn init(
-        &mut self,
-        _tx: UnboundedSender<Box<dyn Action>>,
-    ) -> Result<()> {
-        self.state = TuiWidgetState::new()
-            .set_default_display_level(LevelFilter::Debug);
+    fn init(&mut self, _tx: UnboundedSender<Box<dyn Action>>) -> Result<()> {
+        self.state = TuiWidgetState::new().set_default_display_level(LevelFilter::Debug);
         Ok(())
     }
 
     fn render(&mut self, f: &mut Frame<'_>, rect: Rect) {
         let w = TuiLoggerWidget::default()
-            .block(
-                Block::default()
-                    .title("Log")
-                    .borders(Borders::ALL),
-            )
+            .block(Block::default().title("Log").borders(Borders::ALL))
             .style_error(Style::default().fg(Color::Red))
             .style_debug(Style::default().fg(Color::Green))
             .style_warn(Style::default().fg(Color::Yellow))
-            .style_trace(
-                Style::default().fg(Color::Magenta),
-            )
+            .style_trace(Style::default().fg(Color::Magenta))
             .style_info(Style::default().fg(Color::Cyan))
             .output_separator(':')
             .output_timestamp(Some("%H:%M:%S".to_string()))

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use crossterm::event::{
-    Event as CrosstermEvent, KeyCode, KeyEvent,
-    KeyEventKind, KeyModifiers, MouseEvent,
+    Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent,
 };
 use futures::{FutureExt, StreamExt};
 use serde_derive::{Deserialize, Serialize};
@@ -43,26 +42,17 @@ impl EventHandler {
     ) -> Self {
         let (app_tick_rate, render_tick_rate) = tick_rate;
 
-        let (event_tx, mut event_rx) =
-            mpsc::unbounded_channel();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
 
-        let app_tick_rate =
-            std::time::Duration::from_millis(app_tick_rate);
-        let render_tick_rate =
-            std::time::Duration::from_millis(
-                render_tick_rate,
-            );
+        let app_tick_rate = std::time::Duration::from_millis(app_tick_rate);
+        let render_tick_rate = std::time::Duration::from_millis(render_tick_rate);
 
         let cancellation_token = CancellationToken::new();
-        let _cancellation_token =
-            cancellation_token.clone();
+        let _cancellation_token = cancellation_token.clone();
         let task = tokio::spawn(async move {
-            let mut reader =
-                crossterm::event::EventStream::new();
-            let mut app_interval =
-                tokio::time::interval(app_tick_rate);
-            let mut render_interval =
-                tokio::time::interval(render_tick_rate);
+            let mut reader = crossterm::event::EventStream::new();
+            let mut app_interval = tokio::time::interval(app_tick_rate);
+            let mut render_interval = tokio::time::interval(render_tick_rate);
             loop {
                 let app_delay = app_interval.tick();
                 let render_delay = render_interval.tick();
@@ -75,19 +65,21 @@ impl EventHandler {
                     match maybe_event {
                       Some(Ok(evt)) => {
                         match evt {
-                          CrosstermEvent::Key(key) if key.kind != KeyEventKind::Press => {
-                            if key.kind == KeyEventKind::Press {
-                              event_tx.send(Event::Key(key)).unwrap();
-                            }
-                          },
 
                         CrosstermEvent::Key(KeyEvent {code: KeyCode::Char('c'), modifiers, ..}) if modifiers.contains(KeyModifiers::CONTROL) => {
                             action_tx.send(Box::new(AppAction::Quit)).expect("failed to send quit action");
                         },
 
+                          CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
+                              event_tx.send(Event::Key(key)).unwrap();
+                          },
+
                           CrosstermEvent::Resize(x, y) => {
                             event_tx.send(Event::Resize(x, y)).unwrap();
                           },
+
+
+
                           _ => {},
                         }
                       }
@@ -110,7 +102,10 @@ impl EventHandler {
                 }
             }
         });
-        Self { task, cancellation_token }
+        Self {
+            task,
+            cancellation_token,
+        }
     }
 
     pub fn stop(&mut self) {

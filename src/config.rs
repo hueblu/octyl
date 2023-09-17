@@ -78,15 +78,15 @@ fn extract_modifiers(raw: &str) -> (&str, KeyModifiers) {
             rest if rest.starts_with("ctrl-") => {
                 modifiers.insert(KeyModifiers::CONTROL);
                 current = &rest[5..];
-            },
+            }
             rest if rest.starts_with("alt-") => {
                 modifiers.insert(KeyModifiers::ALT);
                 current = &rest[4..];
-            },
+            }
             rest if rest.starts_with("shift-") => {
                 modifiers.insert(KeyModifiers::SHIFT);
                 current = &rest[6..];
-            },
+            }
             _ => break, // break out of the loop if no known prefix is detected
         };
     }
@@ -112,7 +112,7 @@ fn parse_key_code_with_modifiers(
         "backtab" => {
             modifiers.insert(KeyModifiers::SHIFT);
             KeyCode::BackTab
-        },
+        }
         "backspace" => KeyCode::Backspace,
         "delete" => KeyCode::Delete,
         "insert" => KeyCode::Insert,
@@ -138,7 +138,7 @@ fn parse_key_code_with_modifiers(
                 c = c.to_ascii_uppercase();
             }
             KeyCode::Char(c)
-        },
+        }
         _ => return Err(format!("Unable to parse {raw}")),
     };
     Ok(KeyEvent::new(c, modifiers))
@@ -207,7 +207,10 @@ mod tests {
     fn test_multiple_modifiers() {
         assert_eq!(
             parse_key_event("ctrl-alt-a").unwrap(),
-            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL | KeyModifiers::ALT)
+            KeyEvent::new(
+                KeyCode::Char('a'),
+                KeyModifiers::CONTROL | KeyModifiers::ALT
+            )
         );
 
         assert_eq!(
