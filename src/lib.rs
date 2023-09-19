@@ -6,6 +6,8 @@ pub mod components;
 
 pub mod config;
 
+pub mod editor;
+
 pub mod event;
 
 pub mod terminal;

@@ -1,13 +1,14 @@
+use anyhow::Result;
 use async_trait::async_trait;
 use crossterm::event::KeyEvent;
-use ratatui::layout::{Layout, Rect};
+use ratatui::layout::Rect;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tracing::Level;
 
-use super::{Component, ComponentTreeNode};
+use super::Component;
 use crate::{
     action::{Action, AppAction},
-    components::Layer,
+    components::{Layer, LayerType},
     terminal::Frame,
 };
 
@@ -18,12 +19,14 @@ pub struct Root {
 }
 
 impl Root {
-    pub fn with_component(mut self, component: Box<dyn Component>) -> Self {
-        self.layers.push(Layer::Tiled {
-            root_node: ComponentTreeNode::Leaf { component },
-            active: 0,
-        });
-        self
+    pub fn with_component(mut self, component: Box<dyn Component>) -> Result<Self> {
+        let mut layer = Layer::new_tiled(Some(component));
+        if let Some(ref tx) = self.action_tx {
+            layer.init(tx.clone())?;
+        }
+        self.layers.push(layer);
+
+        Ok(self)
     }
 }
 
@@ -34,51 +37,25 @@ impl Component for Root {
         Ok(())
     }
 
-    fn handle_key_events(&mut self, key: KeyEvent) -> Box<dyn Action> {
+    fn handle_key_event(&mut self, key: KeyEvent) -> Box<dyn Action> {
         tracing::event!(Level::DEBUG, ?key.code, "Root received key event");
 
+        for layer in &mut self.layers {
+            if layer.key_event_opaque() {
+                return layer.handle_key_event(key);
+            } else {
+                layer.handle_key_event(key);
+            }
+        }
         Box::new(AppAction::Noop)
     }
 
-    fn render(&mut self, f: &mut Frame<'_>, area: Rect) {
-        fn render_node(root: &mut ComponentTreeNode, f: &mut Frame<'_>, rect: Rect) {
-            match root {
-                ComponentTreeNode::Leaf { component } => component.render(f, rect),
-                ComponentTreeNode::Branch {
-                    children,
-                    direction,
-                    constraints,
-                    ..
-                } => {
-                    if children.is_empty() {
-                        return;
-                    };
-
-                    let rects = Layout::default()
-                        .direction(direction.clone())
-                        .constraints(constraints.clone().into_boxed_slice())
-                        .split(rect)
-                        .to_vec();
-
-                    for (child, rect) in children.iter_mut().zip(rects) {
-                        render_node(child, f, rect);
-                    }
-                }
-            }
-        }
-
+    fn render(&mut self, f: &mut Frame<'_>, rect: Rect) {
         for layer in &mut self.layers {
-            match layer {
-                Layer::Floating {
-                    ref mut component,
-                    rect,
-                } => {
-                    component.render(f, *rect);
-                }
+            layer.render(f, rect);
 
-                Layer::Tiled { root_node, .. } => {
-                    render_node(root_node, f, area);
-                }
+            if let LayerType::Tiled { .. } = layer.inner {
+                return;
             }
         }
     }

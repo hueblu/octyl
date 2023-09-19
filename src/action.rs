@@ -77,6 +77,7 @@ pub enum AppAction {
     RenderTick,
     Resize(u16, u16),
     Update,
+    Debug,
     Noop,
 }
 

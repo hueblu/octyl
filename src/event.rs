@@ -16,7 +16,6 @@ use crate::{
     components::{root::Root, Component},
 };
 
-// ANCHOR: event
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Event {
     Quit,
@@ -78,8 +77,6 @@ impl EventHandler {
                             event_tx.send(Event::Resize(x, y)).unwrap();
                           },
 
-
-
                           _ => {},
                         }
                       }
@@ -96,8 +93,8 @@ impl EventHandler {
                       event_tx.send(Event::RenderTick).unwrap();
                   },
                   event = event_rx.recv() => {
-                    let action = root.lock().await.handle_events(event).await;
-                    action_tx.send(action).unwrap();
+                    let action = root.lock().await.handle_event(event).await;
+                    action_tx.send(action).expect("Failed to send action");
                   }
                 }
             }
@@ -112,4 +109,3 @@ impl EventHandler {
         self.cancellation_token.cancel();
     }
 }
-// ANCHOR_END: event

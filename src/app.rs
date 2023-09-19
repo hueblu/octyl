@@ -25,7 +25,7 @@ impl App {
     pub fn new() -> Result<Self> {
         let config = Config::new()?;
         let root = Arc::new(Mutex::new(
-            Root::default().with_component(Box::<Logger>::default()),
+            Root::default().with_component(Box::<Logger>::default())?,
         ));
         Ok(Self {
             tick_rate: (30, 60),
