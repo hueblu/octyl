@@ -2,7 +2,7 @@
 name = "octyl"
 version = "0.1.0"
 edition = "2021"
-authors = ["Henry Moore<henrydmoore23@gmail.com>"]
+authors = ["Henry Moore <henrydmoore23@gmail.com>"]
 build = "build.rs"
 license = "LICENSE"
 readme = "README.md"

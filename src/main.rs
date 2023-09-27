@@ -1,18 +1,9 @@
 use anyhow::Result;
-// use clap::Parser;
+use clap::Parser;
 use octyl::{
-    app::App,
-    utils::{
-        initialize_logging,
-        initialize_panic_handler,
-        // version,
-    },
+    app::{App, Args},
+    utils::{initialize_logging, initialize_panic_handler},
 };
-
-/// Define the command line arguments structure
-// #[derive(Parser, Debug)]
-// #[command(version = version(), about = "text editor")]
-// struct Args {}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,8 +11,8 @@ async fn main() -> Result<()> {
 
     initialize_panic_handler();
 
-    // let args = Args::parse();
-    let mut app = App::new()?;
+    let args = Args::parse();
+    let mut app = App::new(args)?;
     app.run().await?;
 
     Ok(())

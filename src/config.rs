@@ -18,8 +18,6 @@ pub struct AppConfig {
 pub struct Config {
     #[serde(default, flatten)]
     pub config: AppConfig,
-    #[serde(default)]
-    pub keymap: KeyMap,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -63,7 +61,18 @@ impl<'de> Deserialize<'de> for KeyMap {
     }
 }
 
-fn parse_key_event(raw: &str) -> Result<KeyEvent, String> {
+pub fn parse_key_event_string(raw: &str) -> Result<Vec<KeyEvent>> {
+    let mut keys = Vec::new();
+    let mut raw_split = raw.split(' ');
+
+    while let Some(key) = raw_split.next() {
+        keys.push(parse_key_event(key)?);
+    }
+
+    Ok(keys)
+}
+
+pub fn parse_key_event(raw: &str) -> Result<KeyEvent> {
     let raw_lower = raw.to_ascii_lowercase();
     let (remaining, modifiers) = extract_modifiers(&raw_lower);
     parse_key_code_with_modifiers(remaining, modifiers)
@@ -75,15 +84,15 @@ fn extract_modifiers(raw: &str) -> (&str, KeyModifiers) {
 
     loop {
         match current {
-            rest if rest.starts_with("ctrl-") => {
+            rest if rest.starts_with("<ctrl>") => {
                 modifiers.insert(KeyModifiers::CONTROL);
                 current = &rest[5..];
             }
-            rest if rest.starts_with("alt-") => {
+            rest if rest.starts_with("<alt>") => {
                 modifiers.insert(KeyModifiers::ALT);
                 current = &rest[4..];
             }
-            rest if rest.starts_with("shift-") => {
+            rest if rest.starts_with("<shift>") => {
                 modifiers.insert(KeyModifiers::SHIFT);
                 current = &rest[6..];
             }
@@ -94,10 +103,7 @@ fn extract_modifiers(raw: &str) -> (&str, KeyModifiers) {
     (current, modifiers)
 }
 
-fn parse_key_code_with_modifiers(
-    raw: &str,
-    mut modifiers: KeyModifiers,
-) -> Result<KeyEvent, String> {
+fn parse_key_code_with_modifiers(raw: &str, mut modifiers: KeyModifiers) -> Result<KeyEvent> {
     let c = match raw {
         "esc" => KeyCode::Esc,
         "enter" => KeyCode::Enter,
@@ -139,15 +145,21 @@ fn parse_key_code_with_modifiers(
             }
             KeyCode::Char(c)
         }
-        _ => return Err(format!("Unable to parse {raw}")),
+        _ => anyhow::bail!("Invalid key: {}", raw),
     };
     Ok(KeyEvent::new(c, modifiers))
 }
 
 impl Config {
-    pub fn new() -> Result<Self, config::ConfigError> {
-        let data_dir = crate::utils::get_data_dir().expect("Unable to get data directory");
-        let config_dir = crate::utils::get_config_dir().expect("Unable to get config directory");
+    pub fn new(
+        config_dir: Option<PathBuf>,
+        data_dir: Option<PathBuf>,
+    ) -> Result<Self, config::ConfigError> {
+        let data_dir = data_dir
+            .unwrap_or_else(|| crate::utils::get_data_dir().expect("Unable to get data directory"));
+        let config_dir = config_dir.unwrap_or_else(|| {
+            crate::utils::get_config_dir().expect("Unable to get config directory")
+        });
         let mut builder = config::Config::builder()
             .set_default("data_dir", data_dir.to_str().unwrap())?
             .set_default("config_dir", config_dir.to_str().unwrap())?

@@ -96,6 +96,7 @@ impl Default for Box<dyn Component> {
     }
 }
 
+#[derive(Debug)]
 pub struct Layer {
     pub inner: LayerType,
     action_tx: Option<mpsc::UnboundedSender<Box<dyn Action>>>,
@@ -136,6 +137,27 @@ impl Layer {
         Self {
             inner: LayerType::new_floating(component, rect),
             action_tx: None,
+        }
+    }
+
+    pub fn with_component(mut self, c: Box<dyn Component>) -> Self {
+        match self.inner {
+            LayerType::Tiled { ref mut root_node } => {
+                root_node.extend(ComponentTreeNode::new_leaf(c));
+            }
+            LayerType::Floating { component, .. } => {
+                self = Self::new_tiled(Some(component)).with_component(c);
+            }
+        }
+        self
+    }
+
+    pub fn add_component(&mut self, c: Box<dyn Component>) {
+        match &mut self.inner {
+            LayerType::Tiled { root_node } => {
+                root_node.extend(ComponentTreeNode::new_leaf(c));
+            }
+            LayerType::Floating { component, .. } => *component = c,
         }
     }
 }
@@ -210,7 +232,7 @@ impl Component for Layer {
 impl LayerType {
     pub fn new_tiled(component: Option<Box<dyn Component>>) -> Self {
         Self::Tiled {
-            root_node: ComponentTreeNode::new_leaf(component.unwrap_or_default()),
+            root_node: ComponentTreeNode::new_leaf(component.unwrap_or(Box::new(EmptyComponent))),
         }
     }
 
@@ -218,6 +240,15 @@ impl LayerType {
         Self::Floating {
             component: component.unwrap_or_default(),
             rect,
+        }
+    }
+}
+
+impl std::fmt::Debug for LayerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LayerType::Floating { .. } => write!(f, "Floating"),
+            LayerType::Tiled { root_node } => write!(f, "Tiled: {:?}", root_node),
         }
     }
 }
@@ -255,6 +286,31 @@ impl ComponentTreeNode {
                 .and_then(|node| node.get_focused_mut()),
         }
     }
+
+    pub fn get_children(&mut self) -> Option<&Vec<ComponentTreeNode>> {
+        match *self {
+            Self::Branch { ref children, .. } => Some(children),
+            _ => None,
+        }
+    }
+
+    pub fn extend(&mut self, other: ComponentTreeNode) {
+        if let Self::Branch {
+            ref mut children, ..
+        } = self
+        {
+            children.push(other)
+        }
+    }
+
+    pub fn leaf_to_branch(self) -> Self {
+        Self::Branch {
+            children: vec![self],
+            direction: Direction::Horizontal,
+            constraints: vec![],
+            focused: 0,
+        }
+    }
 }
 
 impl Default for ComponentTreeNode {
@@ -265,7 +321,33 @@ impl Default for ComponentTreeNode {
     }
 }
 
+impl std::fmt::Debug for ComponentTreeNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ComponentTreeNode::Leaf { .. } => write!(f, "Leaf"),
+            ComponentTreeNode::Branch {
+                children,
+                direction,
+                constraints,
+                focused,
+            } => write!(
+                f,
+                "Branch: {:?} children,  {:?}, {:?}, {:?} focused",
+                children.len(),
+                direction,
+                constraints,
+                focused
+            ),
+        }
+    }
+}
+
 pub struct EmptyComponent;
+impl EmptyComponent {
+    pub(crate) fn default() -> logger::Logger {
+        todo!()
+    }
+}
 
 impl Component for EmptyComponent {
     fn render(&mut self, _f: &mut Frame<'_>, _rect: Rect) {}

@@ -1,6 +1,9 @@
+use crate::{components::Layer, utils::version};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
+use clap::Parser;
 use tokio::sync::{mpsc, Mutex};
 use tracing::Level;
 
@@ -12,6 +15,22 @@ use crate::{
     terminal::TerminalHandler,
 };
 
+/// Define the command line arguments structure
+#[derive(Parser, Debug)]
+#[command(version = version(), about = "text editor")]
+pub struct Args {
+    file: Option<PathBuf>,
+
+    #[arg(short, long, help = "set config dir", value_name = "FILE")]
+    config: Option<PathBuf>,
+
+    #[arg(short, long, help = "set data dir", value_name = "FILE")]
+    data: Option<PathBuf>,
+
+    #[arg(short, long, help = "enable logging")]
+    logger: bool,
+}
+
 pub struct App {
     pub config: Config,
     // (tick_rate, render_tick_rate)
@@ -22,11 +41,17 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Result<Self> {
-        let config = Config::new()?;
-        let root = Arc::new(Mutex::new(
-            Root::default().with_component(Box::<Logger>::default())?,
-        ));
+    pub fn new(args: Args) -> Result<Self> {
+        let config = Config::new(args.config, args.data)?;
+
+        let root = Root::default().with_layer(
+            Layer::new_tiled(Some(Box::<Logger>::default()))
+                .with_component(Box::<Logger>::default()),
+        )?;
+
+        tracing::error!("{:?}", root);
+
+        let root = Arc::new(Mutex::new(root));
         Ok(Self {
             tick_rate: (30, 60),
             root,

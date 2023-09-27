@@ -12,21 +12,23 @@ use crate::{
     terminal::Frame,
 };
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Root {
     layers: Vec<Layer>,
     action_tx: Option<mpsc::UnboundedSender<Box<dyn Action>>>,
 }
 
 impl Root {
-    pub fn with_component(mut self, component: Box<dyn Component>) -> Result<Self> {
-        let mut layer = Layer::new_tiled(Some(component));
+    pub fn with_layer(mut self, mut layer: Layer) -> Result<Self> {
         if let Some(ref tx) = self.action_tx {
             layer.init(tx.clone())?;
         }
         self.layers.push(layer);
-
         Ok(self)
+    }
+
+    pub fn get_layers_mut(&mut self) -> &mut Vec<Layer> {
+        &mut self.layers
     }
 }
 
