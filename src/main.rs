@@ -1,19 +1,8 @@
 use anyhow::Result;
-use clap::Parser;
-use octyl::{
-    app::{App, Args},
-    utils::{initialize_logging, initialize_panic_handler},
-};
+use octyl::app::App;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    initialize_logging()?;
-
-    initialize_panic_handler();
-
-    let args = Args::parse();
-    let mut app = App::new(args)?;
-    app.run().await?;
-
-    Ok(())
+    let mut app = App::init();
+    std::process::exit(app.run().await?);
 }

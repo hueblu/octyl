@@ -1,109 +1,125 @@
-use crate::{components::Layer, utils::version};
-use std::path::PathBuf;
-use std::sync::Arc;
-
 use anyhow::Result;
-use clap::Parser;
-use tokio::sync::{mpsc, Mutex};
-use tracing::Level;
+use futures::Future;
+use tokio::sync::mpsc::UnboundedSender;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::{
-    action::AppAction,
-    components::{logger::Logger, root::Root, Component},
-    config::Config,
-    event::EventHandler,
-    terminal::TerminalHandler,
-};
+use crate::component::{ComponentTree, Components};
+use crate::message::{AppMessage, Message};
 
-/// Define the command line arguments structure
-#[derive(Parser, Debug)]
-#[command(version = version(), about = "text editor")]
-pub struct Args {
-    file: Option<PathBuf>,
+pub type BoxFuture<T> = futures::future::BoxFuture<'static, T>;
+pub type BoxStream<T> = futures::stream::BoxStream<'static, T>;
 
-    #[arg(short, long, help = "set config dir", value_name = "FILE")]
-    config: Option<PathBuf>,
-
-    #[arg(short, long, help = "set data dir", value_name = "FILE")]
-    data: Option<PathBuf>,
-
-    #[arg(short, long, help = "enable logging")]
-    logger: bool,
-}
+pub type BoxMessage = Box<dyn Message>;
+pub type BoxMessageFuture = BoxFuture<BoxMessage>;
+pub type BoxMessageStream = BoxStream<BoxMessage>;
 
 pub struct App {
-    pub config: Config,
-    // (tick_rate, render_tick_rate)
-    pub tick_rate: (u64, u64),
-    pub root: Arc<Mutex<Root>>,
-    pub should_quit: bool,
-    pub should_suspend: bool,
+    messages: UnboundedReceiverStream<BoxMessage>,
+
+    layout: ComponentTree,
+    components: Components,
+
+    suspended: bool,
+    should_quit: bool,
+}
+
+pub enum Command {
+    None,
+    Future(BoxFuture<BoxMessage>),
+    Message(BoxMessage),
+}
+
+impl Command {
+    pub fn boxed<F>(f: F) -> Self
+    where
+        F: Future<Output = BoxMessage> + Send + 'static,
+    {
+        Self::Future(Box::pin(f))
+    }
 }
 
 impl App {
-    pub fn new(args: Args) -> Result<Self> {
-        let config = Config::new(args.config, args.data)?;
+    pub fn init() -> Self {
+        // init logging
+        // init terminal
+        // get cmd args
+        // init config
 
-        let root = Root::default().with_layer(
-            Layer::new_tiled(Some(Box::<Logger>::default()))
-                .with_component(Box::<Logger>::default()),
-        )?;
+        let (msg_tx, msg_rx) = tokio::sync::mpsc::unbounded_channel();
 
-        tracing::error!("{:?}", root);
+        let messages = UnboundedReceiverStream::new(msg_rx);
 
-        let root = Arc::new(Mutex::new(root));
-        Ok(Self {
-            tick_rate: (30, 60),
-            root,
+        Self {
+            messages,
+
+            layout: ComponentTree::new(),
+            components: Components::new(),
+
+            suspended: false,
             should_quit: false,
-            should_suspend: false,
-            config,
-        })
+        }
     }
 
-    pub async fn run(&mut self) -> Result<()> {
-        let (action_tx, mut action_rx) = mpsc::unbounded_channel();
+    pub fn terminate(&mut self) {
+        // terminate terminal
+        // terminate logging
+    }
 
-        self.root.lock().await.init(action_tx.clone())?;
+    pub async fn run(&mut self) -> Result<i32> {
+        // init terminal
 
-        let terminal = TerminalHandler::new(self.root.clone());
-        let mut event = EventHandler::new(self.tick_rate, self.root.clone(), action_tx.clone());
+        Ok(0)
+    }
 
-        loop {
-            if let Some(action) = action_rx.recv().await {
-                let mut consumed = true;
-
-                if let Some(action) = action.as_any().downcast_ref::<AppAction>() {
-                    if *action != AppAction::Tick
-                        && *action != AppAction::RenderTick
-                        && *action != AppAction::Noop
-                    {
-                        tracing::event!(Level::DEBUG, ?action);
-                    }
-
-                    match action {
-                        AppAction::RenderTick => {
-                            terminal.render()?;
-                        }
-                        AppAction::Quit => self.should_quit = true,
-                        _ => consumed = false,
-                    }
-                }
-
-                if !consumed {
-                    if let Some(_action) = self.root.lock().await.dispatch(action).await {
-                        action_tx.send(_action)?;
-                    }
-                };
-            }
-            if self.should_quit {
-                terminal.stop()?;
-                event.stop();
-                terminal.task.await?;
-                event.task.await?;
-                break;
-            }
-        }
+    pub async fn view(&self) -> Result<()> {
         Ok(())
+    }
+
+    pub async fn update(&mut self, action: BoxMessage) -> Command {
+        if let Some(action) = action.as_any().downcast_ref::<AppMessage>() {
+            match action {
+                AppMessage::Quit => {
+                    self.should_quit = true;
+                }
+                AppMessage::Suspend => {
+                    self.suspended = true;
+                }
+                AppMessage::Resume => {
+                    self.suspended = false;
+                }
+                _ => (),
+            }
+        } else {
+            todo!()
+        }
+
+        println!("{:?}", action);
+
+        Command::None
+    }
+}
+
+impl Drop for App {
+    fn drop(&mut self) {
+        self.terminate();
+    }
+}
+
+pub fn process_command(cmd: Command, tx: UnboundedSender<BoxMessage>) {
+    match cmd {
+        Command::Future(fut) => {
+            tokio::spawn(async move {
+                let msg = fut.await;
+                tx.send(msg).expect("failed to send message");
+            });
+        }
+
+        Command::Message(msg) => {
+            tokio::spawn(async move {
+                tx.send(msg).expect("failed to send message");
+            });
+        }
+
+        Command::None => (),
     }
 }

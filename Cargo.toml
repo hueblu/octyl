@@ -2,78 +2,16 @@
 name = "octyl"
 version = "0.1.0"
 edition = "2021"
-authors = ["Henry Moore <henrydmoore23@gmail.com>"]
-build = "build.rs"
-license = "LICENSE"
-readme = "README.md"
 
 [dependencies]
 
 # terminal
-ratatui = { version = "0.23.0" }
-crossterm = { version = "0.27", default-features = false, features = [
-  "event-stream",
-  "serde",
-] }
-tui-input = "0.8"
-libc = "0.2.146"
-colored = "2.0.0"
-
-# args
-clap = { version = "4.3.4", default-features = false, features = [
-  "std",
-  "color",
-  "help",
-  "usage",
-  "error-context",
-  "suggestions",
-  "derive",
-  "cargo",
-  "wrap_help",
-  "unicode",
-  "string",
-  "unstable-styles",
-] }
-clap_complete = "4.3.1"
+crossterm = { version = "0.27", features = ["event-stream"] }
 
 # async
-tokio = { version = "1.28.2", features = ["full"] }
-tokio-stream = "0.1.14"
-tokio-util = "0.7.8"
-futures = "0.3.28"
-async-trait = "0.1"
-async-recursion = "1.0"
+tokio = { version = "1.32", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["full"] }
+futures = { version = "0.3", features = ["async-await"] }
 
 # error handling
-anyhow = "1.0.71"
-better-panic = "0.3.0"
-signal-hook = "0.3.15"
-
-# logging
-log = "0.4.19"
-tracing = "0.1.37"
-tracing-macros = "0.0.0"
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-tui-logger = { version = "0.9", default-features = false, features = [
-  "ratatui-support",
-  "tracing-support",
-] }
-env_logger = "0.10.0"
-
-# text
-unicode-segmentation = "1.10.1"
-
-# util
-serde = { version = "1.0.183", features = ["derive"] }
-serde_derive = "1.0.183"
-config = "0.13.3"
-directories = "5.0.1"
-
-[profile.release]
-codegen-units = 1
-lto = true
-strip = true
-
-[[bin]]
-name = "octyl"
-path = "src/main.rs"
+anyhow = "1.0"
