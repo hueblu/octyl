@@ -1,17 +1,28 @@
-pub mod tree;
+pub mod identifier;
 
-use std::collections::HashMap;
-pub use tree::ComponentTree;
+use std::{any::Any, collections::HashMap};
+
+use identifier::ComponentId;
+
+use crate::{
+    app::{BoxMessage, Command},
+    tui::Frame,
+};
+
+pub type ComponentType = dyn Component<State = Box<dyn Any>>;
 
 pub struct Components {
-    components: HashMap<String, Box<dyn Component>>,
+    components: HashMap<ComponentId, Box<ComponentType>>,
 }
 
+#[async_trait::async_trait]
 pub trait Component {
-    fn init(self);
-}
+    type State: Sized;
 
-pub trait ComponentOptions {}
+    fn init(&self) -> Self::State;
+    async fn view<'a>(&self, model: &Self::State, frame: Frame<'a>);
+    async fn update(&self, model: &mut Self::State, message: BoxMessage) -> Command;
+}
 
 impl Components {
     pub fn new() -> Self {

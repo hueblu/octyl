@@ -1,10 +1,12 @@
 use anyhow::Result;
+use crossterm::event::EventStream;
 use futures::Future;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::component::{ComponentTree, Components};
+use crate::component::Components;
 use crate::message::{AppMessage, Message};
+use crate::view::View;
 
 pub type BoxFuture<T> = futures::future::BoxFuture<'static, T>;
 pub type BoxStream<T> = futures::stream::BoxStream<'static, T>;
@@ -15,8 +17,9 @@ pub type BoxMessageStream = BoxStream<BoxMessage>;
 
 pub struct App {
     messages: UnboundedReceiverStream<BoxMessage>,
+    events: EventStream,
 
-    layout: ComponentTree,
+    view: View,
     components: Components,
 
     suspended: bool,
@@ -51,8 +54,9 @@ impl App {
 
         Self {
             messages,
+            events: EventStream::new(),
 
-            layout: ComponentTree::new(),
+            view: View::new(),
             components: Components::new(),
 
             suspended: false,
@@ -90,7 +94,7 @@ impl App {
                 _ => (),
             }
         } else {
-            todo!()
+            todo!();
         }
 
         println!("{:?}", action);

@@ -1,6 +1,8 @@
 use std::any::Any;
 use std::fmt::Debug;
 
+use crossterm::event::Event;
+
 pub trait Message: Send + Sync + Debug + Any {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
@@ -53,6 +55,7 @@ impl PartialEq for Box<dyn Message> {
 #[derive(PartialEq, Clone, Debug)]
 pub enum AppMessage {
     Quit,
+    Event(Event),
     Suspend,
     Resume,
 }

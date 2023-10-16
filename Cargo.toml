@@ -7,11 +7,13 @@ edition = "2021"
 
 # terminal
 crossterm = { version = "0.27", features = ["event-stream"] }
+ratatui = { version = "0.23" }
 
 # async
 tokio = { version = "1.32", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["full"] }
 futures = { version = "0.3", features = ["async-await"] }
 
-# error handling
+# util
 anyhow = "1.0"
+async-trait = "0.1"
