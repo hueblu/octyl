@@ -6,6 +6,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::component::Components;
 use crate::message::{AppMessage, Message};
+use crate::tui::Tui;
 use crate::view::View;
 
 pub type BoxFuture<T> = futures::future::BoxFuture<'static, T>;
@@ -16,7 +17,7 @@ pub type BoxMessageFuture = BoxFuture<BoxMessage>;
 pub type BoxMessageStream = BoxStream<BoxMessage>;
 
 pub struct App {
-    messages: UnboundedReceiverStream<BoxMessage>,
+    commands: UnboundedReceiverStream<Command>,
     events: EventStream,
 
     view: View,
@@ -50,14 +51,14 @@ impl App {
 
         let (msg_tx, msg_rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let messages = UnboundedReceiverStream::new(msg_rx);
+        let commands = UnboundedReceiverStream::new(msg_rx);
 
         Self {
-            messages,
-            events: EventStream::new(),
+            commands,
+            terminal: Tui::new(),
 
             view: View::new(),
-            components: Components::new(),
+            components: Components::new(msg_tx.clone()),
 
             suspended: false,
             should_quit: false,

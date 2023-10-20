@@ -1,27 +1,28 @@
 use ratatui::prelude::Rect;
 
-use crate::component::{identifier::ComponentId, Component, ComponentType};
+use crate::component::MountedComponent;
 
-pub struct MountedComponent<C>
-where
-    C: Component + Sized,
-{
-    state: C::State,
-    id: ComponentId,
-}
-
+#[derive(Default)]
 pub struct View {
     layers: Vec<Layer>,
 }
 
-pub enum Layer {
-    Floating(Rect, MountedComponent<ComponentType>),
+pub struct Layer {
+    layer_type: LayerType,
+    transparent: bool,
 }
 
-impl Default for View {
-    fn default() -> Self {
-        Self { layers: Vec::new() }
-    }
+pub enum LayerType {
+    Floating {
+        area: Rect,
+        component: MountedComponent,
+    },
+    Tiled(ComponentTree),
+}
+
+pub enum ComponentTree {
+    Branch { children: Vec<ComponentTree> },
+    Leaf { component: MountedComponent },
 }
 
 impl View {
