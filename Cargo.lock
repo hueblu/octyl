@@ -324,9 +324,11 @@ dependencies = [
  "async-trait",
  "crossterm",
  "futures",
+ "log",
  "ratatui",
  "tokio",
  "tokio-stream",
+ "tokio-util",
 ]
 
 [[package]]

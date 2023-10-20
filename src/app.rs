@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::EventStream;
 use futures::Future;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -18,7 +17,7 @@ pub type BoxMessageStream = BoxStream<BoxMessage>;
 
 pub struct App {
     commands: UnboundedReceiverStream<Command>,
-    events: EventStream,
+    terminal: Tui,
 
     view: View,
     components: Components,
@@ -51,11 +50,12 @@ impl App {
 
         let (msg_tx, msg_rx) = tokio::sync::mpsc::unbounded_channel();
 
+        let terminal = Tui::init();
         let commands = UnboundedReceiverStream::new(msg_rx);
 
         Self {
             commands,
-            terminal: Tui::new(),
+            terminal,
 
             view: View::new(),
             components: Components::new(msg_tx.clone()),
@@ -71,8 +71,6 @@ impl App {
     }
 
     pub async fn run(&mut self) -> Result<i32> {
-        // init terminal
-
         Ok(0)
     }
 

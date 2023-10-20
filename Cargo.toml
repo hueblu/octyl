@@ -12,8 +12,12 @@ ratatui = { version = "0.23" }
 # async
 tokio = { version = "1.32", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["full"] }
+tokio-util = "0.7"
 futures = { version = "0.3", features = ["async-await"] }
 
 # util
 anyhow = "1.0"
 async-trait = "0.1"
+
+# logging
+log = "0.4"
