@@ -1,3 +1,4 @@
+
 # octyl
 
 octyl is a WIP text editor for the terminal, written in Rust. It aims to provide a text editing experience akin to that of ![helix](https://helix-editor.com/) or ![vim](https://www.vim.org/), with features like plugins, text highlighting, modal editing, etc. This project is still well in it's infancy, so don't bully me about how bad it is.
@@ -10,7 +11,8 @@ If you'd like to contribute, please follow the guidelines outlined in [CONTRIBUT
 
 This project is still in active development, and here are some planned features:
 
-todo: roadmap
+todo: roadmap, shit
+
 
 ## License
 
