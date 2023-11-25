@@ -1,4 +1,7 @@
+
+# OS specific
+.DS_Store
+
+
+# build artifacts
 /target
-log
-.data
-.config

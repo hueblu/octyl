@@ -1,8 +1,19 @@
+// TODO: config lazy statics
+
 use anyhow::Result;
-use octyl::app::App;
+
+use octyl::{app::App, util};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut app = App::init();
-    std::process::exit(app.run().await?);
+    // TODO: initialize logging
+    // TODO: initialize panic handler
+    // TODO: cli args
+
+    util::init_logging()?;
+
+    let mut app = App::new()?;
+    app.run().await?;
+
+    Ok(())
 }

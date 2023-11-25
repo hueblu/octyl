@@ -1,128 +1,94 @@
+use crate::{
+    action::Action,
+    component::ComponentCollection,
+    components,
+    event::{Event, EventProducer, EventProducerCollection, EventTrait},
+    view::View,
+};
 use anyhow::Result;
-use futures::Future;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
-use crate::component::Components;
-use crate::message::{AppMessage, Message};
-use crate::tui::Tui;
-use crate::view::View;
-
-pub type BoxFuture<T> = futures::future::BoxFuture<'static, T>;
-pub type BoxStream<T> = futures::stream::BoxStream<'static, T>;
-
-pub type BoxMessage = Box<dyn Message>;
-pub type BoxMessageFuture = BoxFuture<BoxMessage>;
-pub type BoxMessageStream = BoxStream<BoxMessage>;
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use tokio::sync::mpsc;
+use tokio_stream::{wrappers::UnboundedReceiverStream, StreamExt};
+use tracing::error;
 
 pub struct App {
-    commands: UnboundedReceiverStream<Command>,
-    terminal: Tui,
+    pub should_close: bool,
 
-    view: View,
-    components: Components,
+    pub view: View,
+    pub components: ComponentCollection,
 
-    suspended: bool,
-    should_quit: bool,
-}
-
-pub enum Command {
-    None,
-    Future(BoxFuture<BoxMessage>),
-    Message(BoxMessage),
-}
-
-impl Command {
-    pub fn boxed<F>(f: F) -> Self
-    where
-        F: Future<Output = BoxMessage> + Send + 'static,
-    {
-        Self::Future(Box::pin(f))
-    }
+    pub event_producers: EventProducerCollection,
 }
 
 impl App {
-    pub fn init() -> Self {
-        // init logging
-        // init terminal
-        // get cmd args
-        // init config
+    pub fn new() -> Result<Self> {
+        let mut stderr = std::io::stderr();
 
-        let (msg_tx, msg_rx) = tokio::sync::mpsc::unbounded_channel();
+        stderr.execute(EnterAlternateScreen)?;
+        enable_raw_mode()?;
 
-        let terminal = Tui::init();
-        let commands = UnboundedReceiverStream::new(msg_rx);
+        Ok(App {
+            should_close: false,
 
-        Self {
-            commands,
-            terminal,
+            view: View::new()?,
+            components: ComponentCollection::new(),
 
-            view: View::new(),
-            components: Components::new(msg_tx.clone()),
+            event_producers: EventProducerCollection::new(),
+        })
+    }
 
-            suspended: false,
-            should_quit: false,
+    pub async fn run(&mut self) -> Result<()> {
+        let logger_id = self
+            .components
+            .register_component(components::logger::logger_component())?;
+        self.view
+            .add_mounted_component(self.components.new_mounted(logger_id)?);
+
+        let (action_tx, action_rx) = mpsc::unbounded_channel::<Action>();
+        let action_stream = UnboundedReceiverStream::new(action_rx);
+
+        loop {
+            if let Some(event) = self.event_producers.next().await {
+                self.handle_event(event, &action_tx).await?;
+            };
+
+            if self.should_close {
+                break;
+            }
         }
-    }
 
-    pub fn terminate(&mut self) {
-        // terminate terminal
-        // terminate logging
-    }
-
-    pub async fn run(&mut self) -> Result<i32> {
-        Ok(0)
-    }
-
-    pub async fn view(&self) -> Result<()> {
         Ok(())
     }
 
-    pub async fn update(&mut self, action: BoxMessage) -> Command {
-        if let Some(action) = action.as_any().downcast_ref::<AppMessage>() {
-            match action {
-                AppMessage::Quit => {
-                    self.should_quit = true;
-                }
-                AppMessage::Suspend => {
-                    self.suspended = true;
-                }
-                AppMessage::Resume => {
-                    self.suspended = false;
-                }
-                _ => (),
-            }
-        } else {
-            todo!();
-        }
+    pub async fn handle_event(
+        &mut self,
+        event: Event,
+        action_tx: &mpsc::UnboundedSender<Action>,
+    ) -> Result<()> {
+        if let Some(state) = self.view.get_focused() {
+            self.components
+                .dispatch_event(event, &state.component_id, action_tx)?;
+        };
 
-        println!("{:?}", action);
+        Ok(())
+    }
 
-        Command::None
+    pub async fn update(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    pub async fn draw(&mut self) -> Result<()> {
+        Ok(())
     }
 }
 
 impl Drop for App {
     fn drop(&mut self) {
-        self.terminate();
-    }
-}
-
-pub fn process_command(cmd: Command, tx: UnboundedSender<BoxMessage>) {
-    match cmd {
-        Command::Future(fut) => {
-            tokio::spawn(async move {
-                let msg = fut.await;
-                tx.send(msg).expect("failed to send message");
-            });
-        }
-
-        Command::Message(msg) => {
-            tokio::spawn(async move {
-                tx.send(msg).expect("failed to send message");
-            });
-        }
-
-        Command::None => (),
+        let mut stderr = std::io::stderr();
+        let _ = stderr.execute(LeaveAlternateScreen);
+        let _ = disable_raw_mode();
     }
 }
